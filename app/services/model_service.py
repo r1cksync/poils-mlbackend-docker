@@ -18,7 +18,8 @@ class ModelService:
     """
     
     def __init__(self):
-        self.api_url = settings.HUGGINGFACE_API_URL
+        # Use new HF Router URL instead of deprecated api-inference
+        self.api_url = settings.HUGGINGFACE_ROUTER_URL
         self.api_key = settings.HUGGINGFACE_API_KEY
         self.model_name = settings.HUGGINGFACE_MODEL
         self.is_loaded = True  # Always "loaded" since we use API
