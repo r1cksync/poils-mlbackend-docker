@@ -13,15 +13,15 @@ class Settings(BaseSettings):
     
     # Hugging Face API configuration
     HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
-    # Hindi OCR Model: Vision Encoder-Decoder (ViT + Hindi RoBERTa)
-    # This model is specifically trained for Hindi handwritten text recognition
-    # Achieves ~73.2% character accuracy with CER of 0.118
-    HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "sabaridsnfuji/Hindi_Offline_Handwritten_OCR")
+    # Use Microsoft TrOCR model (confirmed to work with Inference API)
+    # This model works well for printed text and has some multilingual support
+    # Alternative: "microsoft/trocr-base-handwritten" for handwritten text
+    HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "microsoft/trocr-base-printed")
     # Use HF Serverless Inference API (free tier available)
     # Format: https://api-inference.huggingface.co/models/{model_id}
     # This works without authentication for public models (rate limited)
     # With authentication, gets higher rate limits
-    HUGGINGFACE_API_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'sabaridsnfuji/Hindi_Offline_Handwritten_OCR')}"
+    HUGGINGFACE_API_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-base-printed')}"
     HUGGINGFACE_ROUTER_URL: str = HUGGINGFACE_API_URL
     
     # Image processing

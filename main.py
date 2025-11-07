@@ -67,8 +67,8 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Hindi OCR API",
-    description="FastAPI service for Hindi text extraction using Vision Encoder-Decoder (ViT + Hindi RoBERTa)",
+    title="OCR API (Multi-language support)",
+    description="FastAPI service for text extraction using Microsoft TrOCR models with Inference API support",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -90,7 +90,7 @@ app.add_middleware(
 async def root():
     """Root endpoint - API information"""
     return {
-        "service": "Hindi OCR API",
+        "service": "OCR API (Multi-language)",
         "version": "2.0.0",
         "status": "running",
         "model": settings.HUGGINGFACE_MODEL,

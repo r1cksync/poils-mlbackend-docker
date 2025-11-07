@@ -81,6 +81,7 @@ class ModelService:
                 logger.info(f"Success! Raw result from InferenceClient: {result}")
             except Exception as client_error:
                 logger.error(f"InferenceClient error with PIL Image: {str(client_error)}")
+                logger.error(f"Error type: {type(client_error).__name__}")
                 try:
                     # Fallback: try with raw bytes
                     logger.info("Trying with raw bytes...")
@@ -88,7 +89,24 @@ class ModelService:
                     logger.info(f"Success with bytes! Raw result: {result}")
                 except Exception as bytes_error:
                     logger.error(f"InferenceClient error with bytes: {str(bytes_error)}")
-                    raise RuntimeError(f"Both PIL Image and bytes failed: {str(client_error)}, {str(bytes_error)}")
+                    logger.error(f"Bytes error type: {type(bytes_error).__name__}")
+                    
+                    # Check if model is available
+                    logger.warning(f"Model {self.model_name} may not support Inference API")
+                    logger.info("This could be because:")
+                    logger.info("1. Model doesn't support serverless inference")
+                    logger.info("2. Model requires specific authentication")
+                    logger.info("3. Model is not available via Inference API")
+                    
+                    # Return a helpful error instead of crashing
+                    return {
+                        "text": "",
+                        "confidence": 0.0,
+                        "processing_time": time.time() - start_time,
+                        "device": "cloud-api",
+                        "model": self.model_name,
+                        "error": f"Model '{self.model_name}' not available via Inference API. PIL error: {str(client_error)}, Bytes error: {str(bytes_error)}"
+                    }
             
             # Extract text from response
             extracted_text = ""
