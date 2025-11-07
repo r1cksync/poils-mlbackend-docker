@@ -10,6 +10,7 @@ from app.models.schemas import (
     ErrorResponse, ImageInfo
 )
 from app.services.image_processor import ImageProcessor
+from app.services.model_service import ModelService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,18 @@ router = APIRouter()
 
 # Initialize image processor
 image_processor = ImageProcessor(max_dimension=settings.MAX_IMAGE_DIMENSION)
+
+
+async def get_model_service(request: Request) -> ModelService:
+    """Get model service from app state or create new instance (serverless fallback)"""
+    try:
+        return request.app.state.model_service
+    except AttributeError:
+        # Fallback for serverless environments where lifespan may not run
+        logger.info("Using lazy-loaded model service for serverless environment")
+        service = ModelService()
+        await service.load_model()
+        return service
 
 
 @router.post(
@@ -70,8 +83,8 @@ async def extract_text_from_upload(
         # Prepare image for OCR
         processed_image = image_processor.prepare_image(pil_image, preprocess=True)
         
-        # Get model service from app state
-        model_service = request.app.state.model_service
+        # Get model service
+        model_service = await get_model_service(request)
         
         # Extract text
         result = await model_service.extract_text(processed_image)
@@ -155,7 +168,7 @@ async def extract_text_from_url(
         )
         
         # Get model service
-        model_service = request.app.state.model_service
+        model_service = await get_model_service(request)
         
         # Extract text
         result = await model_service.extract_text(
@@ -221,7 +234,7 @@ async def extract_text_from_base64(
         )
         
         # Get model service
-        model_service = request.app.state.model_service
+        model_service = await get_model_service(request)
         
         # Extract text
         result = await model_service.extract_text(
@@ -255,10 +268,10 @@ async def extract_text_from_base64(
     summary="Get model information",
     description="Get information about the loaded OCR model"
 )
-async def get_model_info(request: Request):
-    """Get information about the loaded Microsoft TrOCR model"""
+async def get_model_info_endpoint(request: Request):
+    """Get information about the Hugging Face OCR service"""
     try:
-        model_service = request.app.state.model_service
+        model_service = await get_model_service(request)
         return model_service.get_model_info()
     except Exception as e:
         logger.error(f"Failed to get model info: {str(e)}")

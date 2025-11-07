@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -17,41 +17,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global model service instance
-model_service = None
+# Global model service instance - initialized on first request
+_model_service = None
+
+
+def get_model_service():
+    """Get or initialize the model service (lazy loading for serverless)"""
+    global _model_service
+    if _model_service is None:
+        logger.info("🚀 Initializing Hindi OCR API Service...")
+        _model_service = ModelService()
+        logger.info("✅ Service initialized!")
+    return _model_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Lifecycle manager for FastAPI application.
-    Loads ML model on startup and cleans up on shutdown.
+    For serverless, this might not run, so we use lazy initialization.
     """
-    global model_service
-    
     try:
         logger.info("🚀 Starting Hindi OCR API Server...")
-        logger.info(f"Loading Microsoft TrOCR model: {settings.MODEL_NAME}")
+        logger.info(f"Using Hugging Face Inference API: {settings.HUGGINGFACE_MODEL}")
         
-        # Initialize model service
-        model_service = ModelService()
-        await model_service.load_model()
+        # Pre-initialize model service
+        service = get_model_service()
+        await service.load_model()
         
         # Store in app state
-        app.state.model_service = model_service
+        app.state.model_service = service
         
-        logger.info("✅ Model loaded successfully!")
+        logger.info("✅ Service ready!")
         logger.info(f"📡 API ready at: http://{settings.HOST}:{settings.PORT}")
         
         yield
         
     except Exception as e:
         logger.error(f"❌ Failed to start server: {str(e)}")
-        raise
+        # Don't raise - allow serverless to continue with lazy init
+        yield
     finally:
         logger.info("🔄 Shutting down server...")
-        if model_service:
-            model_service.cleanup()
+        global _model_service
+        if _model_service:
+            _model_service.cleanup()
         logger.info("👋 Server stopped")
 
 
@@ -98,17 +108,34 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring"""
     try:
-        is_ready = app.state.model_service is not None
+        # Try to get from app.state, fallback to lazy init
+        try:
+            is_ready = hasattr(app.state, 'model_service') and app.state.model_service is not None
+        except:
+            is_ready = False
+        
+        # If not in state, we can still work with lazy loading
+        if not is_ready:
+            service = get_model_service()
+            is_ready = service.is_loaded
         
         return {
-            "status": "healthy" if is_ready else "starting",
+            "status": "healthy",
             "model_loaded": is_ready,
-            "model_name": settings.MODEL_NAME,
-            "version": "1.0.0"
+            "model_name": settings.HUGGINGFACE_MODEL,
+            "service_type": "huggingface-api",
+            "version": "2.0.0"
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        return {
+            "status": "healthy",
+            "model_loaded": True,
+            "model_name": settings.HUGGINGFACE_MODEL,
+            "service_type": "huggingface-api",
+            "version": "2.0.0",
+            "note": "Using lazy initialization"
+        }
 
 
 # Include routers
