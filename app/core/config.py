@@ -14,9 +14,10 @@ class Settings(BaseSettings):
     # Hugging Face API configuration
     HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
     HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "microsoft/trocr-base-printed")
+    # Try the old API URL first (still works with proper auth)
     HUGGINGFACE_API_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-base-printed')}"
-    # New HF Router URL (replaces deprecated api-inference endpoint)
-    HUGGINGFACE_ROUTER_URL: str = f"https://router.huggingface.co/hf-inference/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-base-printed')}"
+    # Alternative: Use serverless inference API
+    HUGGINGFACE_ROUTER_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-base-printed')}"
     
     # Image processing
     MAX_IMAGE_SIZE: int = 10 * 1024 * 1024  # 10MB
