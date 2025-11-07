@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
     
     # Model configuration
-    MODEL_NAME: str = os.getenv("MODEL_NAME", "surajp/trocr-base-hindi")
+    MODEL_NAME: str = os.getenv("MODEL_NAME", "microsoft/trocr-base-printed")
     MODEL_CACHE_DIR: str = os.getenv("MODEL_CACHE_DIR", "./model_cache")
     MAX_IMAGE_SIZE: int = 10 * 1024 * 1024  # 10MB
     

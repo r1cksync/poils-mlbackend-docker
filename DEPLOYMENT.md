@@ -103,11 +103,13 @@ git push -u origin main
    - **Mount Path**: `/app/model_cache`
    - **Size**: 5GB
 
-7. **Environment Variables** (optional):
+6. **Environment Variables** (optional):
    ```
-   MODEL_NAME=surajp/trocr-base-hindi
+   MODEL_NAME=microsoft/trocr-base-printed
    DEBUG=False
    ```
+   
+   **Note:** You can use `microsoft/trocr-large-printed` for better accuracy (but requires more RAM and is slower).
 
 8. **Click** "Create Web Service"
 

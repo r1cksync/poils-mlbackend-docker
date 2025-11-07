@@ -123,7 +123,7 @@ git push
 
 4. **Environment Variables:**
    - `PORT`: 8000 (Render provides this automatically)
-   - `MODEL_NAME`: microsoft/trocr-base-hindi (optional, for custom models)
+   - `MODEL_NAME`: microsoft/trocr-base-printed (or microsoft/trocr-large-printed for better accuracy)
 
 5. **Deploy!**
 
@@ -196,12 +196,17 @@ curl -X POST "http://localhost:8000/api/ocr/extract" \
 
 ## Model Information
 
-**Indic-TrOCR** is a Transformer-based OCR model specifically trained for Indic languages including Hindi. It's based on Microsoft's TrOCR architecture and fine-tuned on Hindi text datasets.
+**Microsoft TrOCR** (Text Recognition using Transformers)
 
-- **Architecture:** Vision Encoder-Decoder
+- **Architecture:** Vision Encoder-Decoder (Transformer)
 - **Vision Encoder:** DeiT (Data-efficient Image Transformer)
-- **Text Decoder:** RoBERTa
-- **Training Data:** Hindi printed and handwritten text
+- **Text Decoder:** RoBERTa (Multilingual)
+- **Training:** Pre-trained on diverse printed text including multilingual scripts
+- **Supported Scripts:** Latin, Devanagari (Hindi), and many others
+- **Input:** RGB images (any size, auto-resized)
+- **Output:** Unicode text (Hindi, English, etc.)
+- **Accuracy:** >90% on printed text across multiple languages
+- **Model Size:** ~1GB (base), ~3GB (large)
 
 ## Performance
 

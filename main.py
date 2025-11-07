@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     
     try:
         logger.info("🚀 Starting Hindi OCR API Server...")
-        logger.info(f"Loading Indic-TrOCR model: {settings.MODEL_NAME}")
+        logger.info(f"Loading Microsoft TrOCR model: {settings.MODEL_NAME}")
         
         # Initialize model service
         model_service = ModelService()
@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="Hindi OCR API",
-    description="FastAPI service for Hindi text extraction using Indic-TrOCR model",
+    description="FastAPI service for Hindi text extraction using Microsoft TrOCR model",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

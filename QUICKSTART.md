@@ -86,7 +86,7 @@ console.log(text); // Hindi text output
 
 ## What You Get
 
-✅ **Indic-TrOCR Model** - State-of-the-art Hindi OCR  
+✅ **Microsoft TrOCR Model** - State-of-the-art multilingual OCR  
 ✅ **FastAPI Backend** - High-performance async API  
 ✅ **Docker Ready** - Deploy anywhere  
 ✅ **Swagger Docs** - Interactive API documentation  

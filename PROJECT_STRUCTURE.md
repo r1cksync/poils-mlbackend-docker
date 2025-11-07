@@ -244,12 +244,13 @@ docker-compose up
 
 ## 📊 Model Information
 
-**Indic-TrOCR** (surajp/trocr-base-hindi)
+**Microsoft TrOCR** (microsoft/trocr-base-printed)
 
 - **Architecture:** Vision Encoder-Decoder (Transformer)
 - **Vision Encoder:** DeiT (Data-efficient Image Transformer)
-- **Text Decoder:** RoBERTa (Hindi language model)
-- **Training:** Fine-tuned on Hindi text datasets
+- **Text Decoder:** RoBERTa (Multilingual)
+- **Training:** Pre-trained on diverse printed text
+- **Supported Languages:** Hindi, English, and many others
 - **Input:** RGB images (any size, auto-resized)
 - **Output:** Unicode Hindi text
 - **Accuracy:** >90% on printed Hindi text

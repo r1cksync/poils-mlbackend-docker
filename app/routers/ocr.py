@@ -27,7 +27,7 @@ image_processor = ImageProcessor(max_dimension=settings.MAX_IMAGE_DIMENSION)
         500: {"model": ErrorResponse}
     },
     summary="Extract text from uploaded image",
-    description="Upload an image file (JPEG, PNG, PDF) and extract Hindi text using Indic-TrOCR"
+    description="Upload an image file (JPEG, PNG, PDF) and extract Hindi text using Microsoft TrOCR"
 )
 async def extract_text_from_upload(
     request: Request,
@@ -112,7 +112,7 @@ async def extract_text_from_upload(
         500: {"model": ErrorResponse}
     },
     summary="Extract text from image URL",
-    description="Provide an image URL and extract Hindi text using Indic-TrOCR"
+    description="Provide an image URL and extract Hindi text using Microsoft TrOCR"
 )
 async def extract_text_from_url(
     request: Request,
@@ -199,7 +199,7 @@ async def extract_text_from_url(
         500: {"model": ErrorResponse}
     },
     summary="Extract text from base64 image",
-    description="Provide a base64 encoded image and extract Hindi text using Indic-TrOCR"
+    description="Provide a base64 encoded image and extract Hindi text using Microsoft TrOCR"
 )
 async def extract_text_from_base64(
     request: Request,
@@ -263,7 +263,7 @@ async def extract_text_from_base64(
     description="Get information about the loaded OCR model"
 )
 async def get_model_info(request: Request):
-    """Get information about the loaded Indic-TrOCR model"""
+    """Get information about the loaded Microsoft TrOCR model"""
     try:
         model_service = request.app.state.model_service
         return model_service.get_model_info()

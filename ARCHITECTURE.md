@@ -50,7 +50,7 @@
                         │                                              │
                         │  ┌────────────────────────────────────────┐ │
                         │  │  Model Service                          │ │
-                        │  │  • Indic-TrOCR Model                    │ │
+                        │  │  • Microsoft TrOCR Model                │ │
                         │  │  • PyTorch Inference                    │ │
                         │  │  • Transformers Pipeline                │ │
                         │  │  • Text extraction                      │ │

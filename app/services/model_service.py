@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class ModelService:
     """
-    Service for managing the Indic-TrOCR model.
+    Service for managing the Microsoft TrOCR model.
     Handles model loading, inference, and resource management.
     """
     

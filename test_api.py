@@ -1,5 +1,5 @@
 """
-Test script for Hindi OCR API
+Test script for Hindi OCR API using Microsoft TrOCR
 """
 import requests
 import base64

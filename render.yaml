@@ -19,7 +19,7 @@ services:
       - key: DEBUG
         value: false
       - key: MODEL_NAME
-        value: surajp/trocr-base-hindi
+        value: microsoft/trocr-base-printed
       - key: MODEL_CACHE_DIR
         value: /app/model_cache
     
