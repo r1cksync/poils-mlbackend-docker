@@ -1,4 +1,6 @@
-import httpx
+import cv2
+import numpy as np
+import pytesseract
 from PIL import Image
 import io
 import logging
@@ -13,35 +15,33 @@ logger = logging.getLogger(__name__)
 
 class ModelService:
     """
-    Service for OCR using Hugging Face Inference API (direct HTTP).
-    More reliable than InferenceClient for serverless environments.
+    Service for Hindi OCR using Tesseract OCR.
+    Supports Hindi, English, and many other languages.
     """
     
     def __init__(self):
-        # Use direct HTTP API instead of InferenceClient (more reliable)
-        self.api_url = f"https://api-inference.huggingface.co/models/{settings.HUGGINGFACE_MODEL}"
-        self.api_key = settings.HUGGINGFACE_API_KEY
-        self.model_name = settings.HUGGINGFACE_MODEL
+        # Use Tesseract OCR for reliable Hindi text recognition
+        self.model_name = "Tesseract OCR (Hindi + English)"
         self.is_loaded = True
         
-        # Build headers
-        self.headers = {}
-        if self.api_key and len(self.api_key) > 10:
-            self.headers["Authorization"] = f"Bearer {self.api_key}"
+        # Configure Tesseract for Hindi and English
+        self.tesseract_config = r'--oem 3 --psm 6 -l hin+eng'
+        
+        # Verify Tesseract installation
+        try:
+            version = pytesseract.get_tesseract_version()
+            logger.info(f"Tesseract version: {version}")
+        except Exception as e:
+            logger.warning(f"Tesseract not found locally: {e}")
     
     async def load_model(self):
         """
-        No model loading needed - using Hugging Face Inference API directly.
+        No model loading needed - Tesseract is ready to use.
         This method exists for compatibility with the original interface.
         """
-        logger.info(f"✅ Using Hugging Face Inference API (direct HTTP)")
-        logger.info(f"Model: {self.model_name}")
-        logger.info(f"API URL: {self.api_url}")
-        
-        if not self.api_key or len(self.api_key) < 10:
-            logger.warning("⚠️ No HUGGINGFACE_API_KEY provided - using free tier (rate limited)")
-        else:
-            logger.info("✅ API key configured")
+        logger.info(f"✅ Using Tesseract OCR Engine")
+        logger.info(f"Languages: Hindi (hin) + English (eng)")
+        logger.info(f"Config: {self.tesseract_config}")
         
         self.is_loaded = True
     
@@ -51,11 +51,11 @@ class ModelService:
         max_length: int = 512
     ) -> Dict:
         """
-        Extract text from image using Hugging Face Inference API (direct HTTP).
+        Extract Hindi/English text from image using Tesseract OCR.
         
         Args:
             image: PIL Image to process
-            max_length: Not used with API, kept for compatibility
+            max_length: Not used with Tesseract, kept for compatibility
             
         Returns:
             Dictionary with extracted text and metadata
@@ -66,90 +66,77 @@ class ModelService:
         try:
             start_time = time.time()
             
-            # Convert PIL Image to bytes
-            buffer = io.BytesIO()
-            image.save(buffer, format='JPEG', quality=95)
-            image_bytes = buffer.getvalue()
+            # Convert PIL to OpenCV format for preprocessing
+            opencv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             
-            logger.info(f"Sending request to HF Inference API ({len(image_bytes)} bytes)")
+            # Preprocess image for better OCR results
+            # Convert to grayscale
+            gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
             
-            # Call Hugging Face Inference API directly
-            async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
-                response = await client.post(
-                    self.api_url,
-                    headers=self.headers,
-                    content=image_bytes
+            # Apply Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+            
+            # Apply threshold to get better contrast
+            _, threshold = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Convert back to PIL Image for Tesseract
+            processed_image = Image.fromarray(threshold)
+            
+            logger.info(f"Processing image with Tesseract OCR (Hindi + English)")
+            
+            # Extract text using Tesseract
+            try:
+                # Try with Hindi + English
+                extracted_text = pytesseract.image_to_string(
+                    processed_image, 
+                    config=self.tesseract_config,
+                    timeout=30
                 )
-            
-            # Handle response
-            if response.status_code == 200:
-                result = response.json()
-                logger.info(f"API Response: {result}")
                 
-                # Extract text from response
-                extracted_text = ""
-                if isinstance(result, list) and len(result) > 0:
-                    if isinstance(result[0], dict) and "generated_text" in result[0]:
-                        extracted_text = result[0]["generated_text"]
-                    elif isinstance(result[0], str):
-                        extracted_text = result[0]
-                elif isinstance(result, dict) and "generated_text" in result:
-                    extracted_text = result["generated_text"]
-                elif isinstance(result, str):
-                    extracted_text = result
+                # Get confidence scores
+                data = pytesseract.image_to_data(
+                    processed_image,
+                    config=self.tesseract_config,
+                    output_type=pytesseract.Output.DICT
+                )
                 
-                processing_time = time.time() - start_time
-                logger.info(f"✅ Text extracted in {processing_time:.2f}s: '{extracted_text}'")
+                # Calculate average confidence
+                confidences = [int(conf) for conf in data['conf'] if int(conf) > 0]
+                avg_confidence = sum(confidences) / len(confidences) if confidences else 0
                 
-                return {
-                    "text": extracted_text.strip(),
-                    "confidence": 0.85,  # API doesn't provide confidence
-                    "processing_time": round(processing_time, 2),
-                    "device": "cloud-api",
-                    "model": self.model_name
-                }
+            except Exception as tesseract_error:
+                logger.warning(f"Hindi OCR failed: {tesseract_error}. Trying English only...")
+                # Fallback to English only
+                extracted_text = pytesseract.image_to_string(
+                    processed_image,
+                    config=r'--oem 3 --psm 6 -l eng'
+                )
+                avg_confidence = 75  # Default confidence for English fallback
             
-            elif response.status_code == 503:
-                # Model is loading
-                logger.warning("Model is loading on Hugging Face, please retry in a moment")
-                return {
-                    "text": "",
-                    "confidence": 0.0,
-                    "processing_time": time.time() - start_time,
-                    "device": "cloud-api",
-                    "model": self.model_name,
-                    "error": "Model is loading, please retry in 20-30 seconds"
-                }
+            processing_time = time.time() - start_time
             
-            else:
-                error_msg = f"API request failed: {response.status_code} - {response.text[:200]}"
-                logger.error(error_msg)
-                return {
-                    "text": "",
-                    "confidence": 0.0,
-                    "processing_time": time.time() - start_time,
-                    "device": "cloud-api",
-                    "model": self.model_name,
-                    "error": f"API error: {response.status_code}"
-                }
+            # Clean up the text
+            cleaned_text = extracted_text.strip()
             
-        except httpx.TimeoutException:
-            logger.error("Request timeout - API took too long to respond")
+            logger.info(f"✅ Text extracted in {processing_time:.2f}s")
+            logger.info(f"Extracted text: '{cleaned_text[:100]}...'")
+            logger.info(f"Confidence: {avg_confidence:.1f}%")
+            
             return {
-                "text": "",
-                "confidence": 0.0,
-                "processing_time": time.time() - start_time,
-                "device": "cloud-api",
-                "model": self.model_name,
-                "error": "Request timeout"
+                "text": cleaned_text,
+                "confidence": round(avg_confidence / 100, 2),  # Convert to 0-1 scale
+                "processing_time": round(processing_time, 2),
+                "device": "local-tesseract",
+                "model": self.model_name
             }
+            
         except Exception as e:
             logger.error(f"Text extraction failed: {str(e)}")
             return {
                 "text": "",
                 "confidence": 0.0,
                 "processing_time": time.time() - start_time,
-                "device": "cloud-api",
+                "device": "local-tesseract",
                 "model": self.model_name,
                 "error": f"OCR failed: {str(e)}"
             }
@@ -193,12 +180,19 @@ class ModelService:
         self.is_loaded = False
     
     def get_model_info(self) -> Dict:
-        """Get information about the Inference API service"""
+        """Get information about the Tesseract OCR service"""
+        try:
+            version = pytesseract.get_tesseract_version()
+            version_str = str(version)
+        except:
+            version_str = "Unknown"
+            
         return {
             "model_name": self.model_name,
             "is_loaded": self.is_loaded,
-            "service_type": "huggingface-inference-api",
-            "api_url": self.api_url,
-            "has_api_key": bool(self.api_key and len(self.api_key) > 10),
-            "rate_limit": "Free tier (rate limited)" if not (self.api_key and len(self.api_key) > 10) else "Authenticated (higher limits)"
+            "service_type": "tesseract-ocr",
+            "version": version_str,
+            "languages": "Hindi (hin) + English (eng)",
+            "has_api_key": False,  # Tesseract doesn't need API key
+            "rate_limit": "No limits (local processing)"
         }

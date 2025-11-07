@@ -67,9 +67,9 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="OCR API (Multi-language support)",
-    description="FastAPI service for text extraction using Microsoft TrOCR models with Inference API support",
-    version="2.0.0",
+    title="Hindi OCR API (Tesseract)",
+    description="FastAPI service for Hindi and English text extraction using Tesseract OCR",
+    version="3.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -90,10 +90,10 @@ app.add_middleware(
 async def root():
     """Root endpoint - API information"""
     return {
-        "service": "OCR API (Multi-language)",
-        "version": "2.0.0",
+        "service": "Hindi OCR API (Tesseract)",
+        "version": "3.0.0",
         "status": "running",
-        "model": settings.HUGGINGFACE_MODEL,
+        "model": "Tesseract OCR (Hindi + English)",
         "endpoints": {
             "health": "/health",
             "docs": "/docs",
@@ -122,18 +122,18 @@ async def health_check():
         return {
             "status": "healthy",
             "model_loaded": is_ready,
-            "model_name": settings.HUGGINGFACE_MODEL,
-            "service_type": "huggingface-api",
-            "version": "2.0.0"
+            "model_name": "Tesseract OCR (Hindi + English)",
+            "service_type": "tesseract-ocr",
+            "version": "3.0.0"
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "healthy",
             "model_loaded": True,
-            "model_name": settings.HUGGINGFACE_MODEL,
-            "service_type": "huggingface-api",
-            "version": "2.0.0",
+            "model_name": "Tesseract OCR (Hindi + English)",
+            "service_type": "tesseract-ocr",
+            "version": "3.0.0",
             "note": "Using lazy initialization"
         }
 
