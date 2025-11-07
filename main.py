@@ -67,9 +67,9 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI application
 app = FastAPI(
-    title="Hindi OCR API (Tesseract)",
-    description="FastAPI service for Hindi and English text extraction using Tesseract OCR",
-    version="3.0.0",
+    title="Hindi OCR API (Google Cloud Vision)",
+    description="FastAPI service for Hindi and English text extraction using Google Cloud Vision API",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -90,10 +90,10 @@ app.add_middleware(
 async def root():
     """Root endpoint - API information"""
     return {
-        "service": "Hindi OCR API (Tesseract)",
-        "version": "3.0.0",
+        "service": "Hindi OCR API (Google Cloud Vision)",
+        "version": "4.0.0",
         "status": "running",
-        "model": "Tesseract OCR (Hindi + English)",
+        "model": "Google Cloud Vision API",
         "endpoints": {
             "health": "/health",
             "docs": "/docs",
@@ -122,18 +122,18 @@ async def health_check():
         return {
             "status": "healthy",
             "model_loaded": is_ready,
-            "model_name": "Tesseract OCR (Hindi + English)",
-            "service_type": "tesseract-ocr",
-            "version": "3.0.0"
+            "model_name": "Google Cloud Vision API",
+            "service_type": "google-cloud-vision",
+            "version": "4.0.0"
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "healthy",
             "model_loaded": True,
-            "model_name": "Tesseract OCR (Hindi + English)",
-            "service_type": "tesseract-ocr",
-            "version": "3.0.0",
+            "model_name": "Google Cloud Vision API",
+            "service_type": "google-cloud-vision",
+            "version": "4.0.0",
             "note": "Using lazy initialization"
         }
 

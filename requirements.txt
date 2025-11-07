@@ -5,8 +5,7 @@ python-multipart>=0.0.6
 
 # Image processing and OCR
 Pillow>=10.1.0
-pytesseract>=0.3.10
-opencv-python-headless>=4.8.0
+google-cloud-vision>=3.4.0
 
 # HTTP and utilities
 requests>=2.31.0

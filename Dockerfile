@@ -4,11 +4,8 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for Tesseract OCR
+# Install system dependencies for image processing only
 RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    tesseract-ocr-hin \
-    tesseract-ocr-eng \
     libgl1-mesa-glx \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
