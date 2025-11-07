@@ -1,4 +1,5 @@
 import httpx
+from huggingface_hub import InferenceClient
 from PIL import Image
 import io
 import logging
@@ -13,33 +14,31 @@ logger = logging.getLogger(__name__)
 
 class ModelService:
     """
-    Service for Hindi OCR using Hugging Face Inference API.
-    No local model loading required - uses cloud API instead.
+    Service for Hindi OCR using Hugging Face InferenceClient.
+    Uses the new huggingface_hub library instead of deprecated API.
     """
     
     def __init__(self):
-        # Use HF Inference API
-        self.api_url = settings.HUGGINGFACE_ROUTER_URL
+        # Use HF InferenceClient with the new API
         self.api_key = settings.HUGGINGFACE_API_KEY
         self.model_name = settings.HUGGINGFACE_MODEL
-        self.is_loaded = True  # Always "loaded" since we use API
+        self.is_loaded = True
         
-        # Build headers - let httpx set Content-Type automatically for binary data
-        self.headers = {}
-        if self.api_key and len(self.api_key) > 10:
-            # Try with authorization first, will fallback to free tier on error
-            self.headers["Authorization"] = f"Bearer {self.api_key}"
+        # Initialize InferenceClient
+        self.client = InferenceClient(
+            model=self.model_name,
+            token=self.api_key if self.api_key and len(self.api_key) > 10 else None
+        )
     
     async def load_model(self):
         """
-        No model loading needed - using Hugging Face Inference API.
+        No model loading needed - using Hugging Face InferenceClient.
         This method exists for compatibility with the original interface.
         """
-        logger.info(f"✅ Using Hugging Face Inference API")
+        logger.info(f"✅ Using Hugging Face InferenceClient")
         logger.info(f"Model: {self.model_name}")
-        logger.info(f"API: {self.api_url}")
         
-        if not self.api_key:
+        if not self.api_key or len(self.api_key) < 10:
             logger.warning("⚠️ No HUGGINGFACE_API_KEY provided - using free tier (rate limited)")
         else:
             logger.info("✅ API key configured")
@@ -52,7 +51,7 @@ class ModelService:
         max_length: int = 512
     ) -> Dict:
         """
-        Extract Hindi text from image using Hugging Face Inference API.
+        Extract text from image using Hugging Face InferenceClient.
         
         Args:
             image: PIL Image to process
@@ -72,96 +71,41 @@ class ModelService:
             image.save(buffer, format='PNG')
             image_bytes = buffer.getvalue()
             
-            logger.info(f"Sending request to Hugging Face API ({len(image_bytes)} bytes)")
+            logger.info(f"Sending request to Hugging Face InferenceClient ({len(image_bytes)} bytes)")
             
-            # Call Hugging Face Inference API
-            async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
-                response = await client.post(
-                    self.api_url,
-                    headers=self.headers,
-                    content=image_bytes  # Use 'content' for raw binary data
-                )
+            # Use InferenceClient for image-to-text
+            # This uses the new serverless inference API
+            result = self.client.image_to_text(image_bytes)
             
-            # Handle response
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Extract text from response
-                # API returns: {"generated_text": "extracted text"}
-                extracted_text = ""
-                if isinstance(result, list) and len(result) > 0:
-                    extracted_text = result[0].get("generated_text", "")
-                elif isinstance(result, dict):
-                    extracted_text = result.get("generated_text", "")
-                
-                processing_time = time.time() - start_time
-                
-                logger.info(f"✅ Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
-                
-                return {
-                    "text": extracted_text.strip(),
-                    "confidence": 0.85,  # API doesn't provide confidence
-                    "processing_time": round(processing_time, 2),
-                    "device": "cloud-api",
-                    "model": self.model_name
-                }
+            # Extract text from response
+            extracted_text = ""
+            if isinstance(result, str):
+                extracted_text = result
+            elif isinstance(result, dict) and "generated_text" in result:
+                extracted_text = result["generated_text"]
             
-            elif response.status_code == 403 or response.status_code == 410:
-                # API key has insufficient permissions or endpoint deprecated with auth, try without auth
-                logger.warning(f"Auth error ({response.status_code}), retrying without authentication (free tier)")
-                
-                async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
-                    retry_response = await client.post(
-                        self.api_url,
-                        content=image_bytes  # Use 'content' instead of 'data' for raw bytes
-                    )
-                
-                if retry_response.status_code == 200:
-                    result = retry_response.json()
-                    extracted_text = ""
-                    if isinstance(result, list) and len(result) > 0:
-                        extracted_text = result[0].get("generated_text", "")
-                    elif isinstance(result, dict):
-                        extracted_text = result.get("generated_text", "")
-                    
-                    processing_time = time.time() - start_time
-                    logger.info(f"✅ Text extracted (free tier) in {processing_time:.2f}s: {extracted_text[:50]}...")
-                    
-                    return {
-                        "text": extracted_text.strip(),
-                        "confidence": 0.85,
-                        "processing_time": round(processing_time, 2),
-                        "device": "cloud-api-free",
-                        "model": self.model_name
-                    }
-                else:
-                    error_msg = f"API request failed even without auth: {retry_response.status_code} - {retry_response.text[:200]}"
-                    logger.error(error_msg)
-                    raise RuntimeError(error_msg)
+            processing_time = time.time() - start_time
+            logger.info(f"✅ Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
             
-            elif response.status_code == 503:
-                # Model is loading
-                logger.warning("Model is loading on Hugging Face, please retry in a moment")
-                return {
-                    "text": "",
-                    "confidence": 0.0,
-                    "processing_time": time.time() - start_time,
-                    "device": "cloud-api",
-                    "model": self.model_name,
-                    "error": "Model is loading, please retry in 20-30 seconds"
-                }
+            return {
+                "text": extracted_text.strip(),
+                "confidence": 0.85,  # API doesn't provide confidence
+                "processing_time": round(processing_time, 2),
+                "device": "cloud-api",
+                "model": self.model_name
+            }
             
-            else:
-                error_msg = f"API request failed: {response.status_code} - {response.text}"
-                logger.error(error_msg)
-                raise RuntimeError(error_msg)
-            
-        except httpx.TimeoutException:
-            logger.error("Request timeout - API took too long to respond")
-            raise RuntimeError("Request timeout - please try again")
         except Exception as e:
             logger.error(f"Text extraction failed: {str(e)}")
-            raise RuntimeError(f"OCR processing failed: {str(e)}")
+            # Return informative error
+            return {
+                "text": "",
+                "confidence": 0.0,
+                "processing_time": time.time() - start_time,
+                "device": "cloud-api",
+                "model": self.model_name,
+                "error": f"OCR failed: {str(e)}"
+            }
     
     async def batch_extract(
         self, 
