@@ -18,17 +18,16 @@ class ModelService:
     """
     
     def __init__(self):
-        # Use new HF Router URL instead of deprecated api-inference
+        # Use HF Inference API
         self.api_url = settings.HUGGINGFACE_ROUTER_URL
         self.api_key = settings.HUGGINGFACE_API_KEY
         self.model_name = settings.HUGGINGFACE_MODEL
         self.is_loaded = True  # Always "loaded" since we use API
         
-        # Only use API key if explicitly set and not empty
-        # Some API keys may cause 410 errors with the inference API
-        self.headers = {"Content-Type": "image/png"}
+        # Build headers - let httpx set Content-Type automatically for binary data
+        self.headers = {}
         if self.api_key and len(self.api_key) > 10:
-            # Try with authorization first, will fallback to free tier on 403/410
+            # Try with authorization first, will fallback to free tier on error
             self.headers["Authorization"] = f"Bearer {self.api_key}"
     
     async def load_model(self):
@@ -80,7 +79,7 @@ class ModelService:
                 response = await client.post(
                     self.api_url,
                     headers=self.headers,
-                    data=image_bytes
+                    content=image_bytes  # Use 'content' for raw binary data
                 )
             
             # Handle response
@@ -114,8 +113,7 @@ class ModelService:
                 async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
                     retry_response = await client.post(
                         self.api_url,
-                        headers={"Content-Type": "image/png"},
-                        data=image_bytes
+                        content=image_bytes  # Use 'content' instead of 'data' for raw bytes
                     )
                 
                 if retry_response.status_code == 200:
