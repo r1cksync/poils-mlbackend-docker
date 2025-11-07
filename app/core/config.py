@@ -13,12 +13,15 @@ class Settings(BaseSettings):
     
     # Hugging Face API configuration
     HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
-    HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "microsoft/trocr-base-printed")
+    # Use Tesseract OCR via Hugging Face (supports Hindi and many languages)
+    # Alternative: "microsoft/trocr-base-handwritten" for English
+    # For Hindi: Try "surajp/trocr-base-hindi" or use general OCR models
+    HUGGINGFACE_MODEL: str = os.getenv("HUGGINGFACE_MODEL", "microsoft/trocr-large-printed")
     # Use HF Serverless Inference API (free tier available)
     # Format: https://api-inference.huggingface.co/models/{model_id}
     # This works without authentication for public models (rate limited)
     # With authentication, gets higher rate limits
-    HUGGINGFACE_API_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-base-printed')}"
+    HUGGINGFACE_API_URL: str = f"https://api-inference.huggingface.co/models/{os.getenv('HUGGINGFACE_MODEL', 'microsoft/trocr-large-printed')}"
     HUGGINGFACE_ROUTER_URL: str = HUGGINGFACE_API_URL
     
     # Image processing
