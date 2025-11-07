@@ -9,7 +9,7 @@ from pathlib import Path
 
 # API Configuration
 API_URL = "https://poils-mlbackend-docker.vercel.app"
-IMAGE_PATH = r"C:\Users\user\Downloads\maxresdefault.jpg"
+IMAGE_PATH = r"C:\Users\user\Downloads\68c1585c325a7ac16aa794f764093f6b.jpg"
 
 
 def test_health():

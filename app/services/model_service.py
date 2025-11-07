@@ -74,15 +74,29 @@ class ModelService:
             logger.info(f"Sending request to Hugging Face InferenceClient ({len(image_bytes)} bytes)")
             
             # Use InferenceClient for image-to-text
-            # This uses the new serverless inference API
-            result = self.client.image_to_text(image_bytes)
+            # Pass the raw bytes directly to the client
+            try:
+                result = self.client.image_to_text(image_bytes)
+                logger.info(f"Raw result from InferenceClient: {result}")
+            except Exception as client_error:
+                logger.error(f"InferenceClient error: {str(client_error)}")
+                # Fallback: try with PIL Image object
+                result = self.client.image_to_text(image)
             
             # Extract text from response
             extracted_text = ""
             if isinstance(result, str):
                 extracted_text = result
+            elif isinstance(result, list) and len(result) > 0:
+                # Result might be a list of dictionaries
+                if isinstance(result[0], dict) and "generated_text" in result[0]:
+                    extracted_text = result[0]["generated_text"]
+                elif isinstance(result[0], str):
+                    extracted_text = result[0]
             elif isinstance(result, dict) and "generated_text" in result:
                 extracted_text = result["generated_text"]
+            
+            logger.info(f"Extracted text: '{extracted_text}'")
             
             processing_time = time.time() - start_time
             logger.info(f"✅ Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
@@ -146,12 +160,12 @@ class ModelService:
         self.is_loaded = False
     
     def get_model_info(self) -> Dict:
-        """Get information about the API service"""
+        """Get information about the InferenceClient service"""
         return {
             "model_name": self.model_name,
             "is_loaded": self.is_loaded,
-            "service_type": "huggingface-inference-api",
-            "api_url": self.api_url,
-            "has_api_key": bool(self.api_key),
-            "rate_limit": "Free tier (no key)" if not self.api_key else "Authenticated"
+            "service_type": "huggingface-inference-client",
+            "client_type": "InferenceClient",
+            "has_api_key": bool(self.api_key and len(self.api_key) > 10),
+            "rate_limit": "Free tier (rate limited)" if not (self.api_key and len(self.api_key) > 10) else "Authenticated (higher limits)"
         }
