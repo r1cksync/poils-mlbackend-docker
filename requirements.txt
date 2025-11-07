@@ -1,24 +1,24 @@
 # FastAPI and server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
 
 # Machine Learning & OCR
-torch==2.1.0
-torchvision==0.16.0
-transformers==4.35.0
-Pillow==10.1.0
-opencv-python-headless==4.8.1.78
+torch>=2.1.0
+torchvision>=0.16.0
+transformers>=4.35.0
+Pillow>=10.1.0
+opencv-python-headless>=4.8.1.78
 
 # Image processing
-numpy==1.26.0
-pdf2image==1.16.3
+numpy>=1.26.0
+pdf2image>=1.16.3
 
 # HTTP and utilities
-requests==2.31.0
-aiofiles==23.2.1
-python-dotenv==1.0.0
+requests>=2.31.0
+aiofiles>=23.2.1
+python-dotenv>=1.0.0
 
 # Monitoring and logging
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
