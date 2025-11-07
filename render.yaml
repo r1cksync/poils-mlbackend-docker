@@ -1,0 +1,33 @@
+# Render.com deployment configuration
+# This file is used by Render to automatically deploy your service
+
+services:
+  - type: web
+    name: hindi-ocr-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter  # Change to 'free' or 'standard' as needed
+    region: oregon  # Choose region closest to your users
+    branch: main
+    autoDeploy: true
+    
+    # Environment variables
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DEBUG
+        value: false
+      - key: MODEL_NAME
+        value: surajp/trocr-base-hindi
+      - key: MODEL_CACHE_DIR
+        value: /app/model_cache
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Disk storage for model cache
+    disk:
+      name: model-cache
+      mountPath: /app/model_cache
+      sizeGB: 5
