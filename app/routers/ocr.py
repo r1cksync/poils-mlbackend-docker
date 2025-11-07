@@ -4,6 +4,7 @@ import logging
 import time
 import aiohttp
 import io
+import base64
 
 from app.models.schemas import (
     OCRResponse, OCRURLRequest, OCRBase64Request, 
@@ -74,20 +75,20 @@ async def extract_text_from_upload(
         
         start_time = time.time()
         
-        # Convert to PIL Image
+        # Convert to PIL Image for metadata only
         pil_image = image_processor.bytes_to_image(contents)
         
         # Get image info before processing
         original_info = image_processor.get_image_info(pil_image)
         
-        # Prepare image for OCR
-        processed_image = image_processor.prepare_image(pil_image, preprocess=True)
+        # For Google Cloud Vision, we pass raw bytes directly
+        # No need for preprocessing as Vision API handles it internally
         
         # Get model service
         model_service = await get_model_service(request)
         
-        # Extract text
-        result = await model_service.extract_text(processed_image)
+        # Extract text using raw image bytes
+        result = await model_service.extract_text(contents)
         
         total_time = time.time() - start_time
         
@@ -155,26 +156,20 @@ async def extract_text_from_url(
                 detail=f"Image too large. Maximum size: {settings.MAX_IMAGE_SIZE / 1024 / 1024}MB"
             )
         
-        # Convert to PIL Image
+        # Convert to PIL Image for metadata only
         pil_image = image_processor.bytes_to_image(image_bytes)
         
         # Get image info
         original_info = image_processor.get_image_info(pil_image)
         
-        # Prepare image
-        processed_image = image_processor.prepare_image(
-            pil_image, 
-            preprocess=ocr_request.preprocess
-        )
+        # For Google Cloud Vision, pass raw bytes directly
+        # No need for preprocessing as Vision API handles it
         
         # Get model service
         model_service = await get_model_service(request)
         
-        # Extract text
-        result = await model_service.extract_text(
-            processed_image,
-            max_length=ocr_request.max_length
-        )
+        # Extract text using raw image bytes
+        result = await model_service.extract_text(image_bytes)
         
         total_time = time.time() - start_time
         
@@ -221,26 +216,28 @@ async def extract_text_from_base64(
         
         start_time = time.time()
         
-        # Convert base64 to PIL Image
+        # Extract bytes from base64 for Google Cloud Vision
+        try:
+            base64_data = ocr_request.image_base64
+            # Remove data URL prefix if present
+            if ',' in base64_data:
+                base64_data = base64_data.split(',')[1]
+            
+            image_bytes = base64.b64decode(base64_data)
+        except Exception as e:
+            raise ValueError("Invalid base64 image data")
+        
+        # Convert to PIL Image for metadata only
         pil_image = image_processor.base64_to_image(ocr_request.image_base64)
         
         # Get image info
         original_info = image_processor.get_image_info(pil_image)
         
-        # Prepare image
-        processed_image = image_processor.prepare_image(
-            pil_image,
-            preprocess=ocr_request.preprocess
-        )
-        
         # Get model service
         model_service = await get_model_service(request)
         
-        # Extract text
-        result = await model_service.extract_text(
-            processed_image,
-            max_length=ocr_request.max_length
-        )
+        # Extract text using raw image bytes
+        result = await model_service.extract_text(image_bytes)
         
         total_time = time.time() - start_time
         
