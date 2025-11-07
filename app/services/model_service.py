@@ -24,8 +24,11 @@ class ModelService:
         self.model_name = settings.HUGGINGFACE_MODEL
         self.is_loaded = True  # Always "loaded" since we use API
         
-        self.headers = {}
-        if self.api_key:
+        # Only use API key if explicitly set and not empty
+        # Some API keys may cause 410 errors with the inference API
+        self.headers = {"Content-Type": "image/png"}
+        if self.api_key and len(self.api_key) > 10:
+            # Try with authorization first, will fallback to free tier on 403/410
             self.headers["Authorization"] = f"Bearer {self.api_key}"
     
     async def load_model(self):
@@ -104,13 +107,14 @@ class ModelService:
                     "model": self.model_name
                 }
             
-            elif response.status_code == 403:
-                # API key has insufficient permissions, try without auth
-                logger.warning("API key has insufficient permissions, retrying without authentication (free tier)")
+            elif response.status_code == 403 or response.status_code == 410:
+                # API key has insufficient permissions or endpoint deprecated with auth, try without auth
+                logger.warning(f"Auth error ({response.status_code}), retrying without authentication (free tier)")
                 
-                async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
+                async with httpx.AsyncClient(timeout=settings.API_timeout) as client:
                     retry_response = await client.post(
                         self.api_url,
+                        headers={"Content-Type": "image/png"},
                         data=image_bytes
                     )
                 
@@ -133,7 +137,7 @@ class ModelService:
                         "model": self.model_name
                     }
                 else:
-                    error_msg = f"API request failed even without auth: {retry_response.status_code} - {retry_response.text}"
+                    error_msg = f"API request failed even without auth: {retry_response.status_code} - {retry_response.text[:200]}"
                     logger.error(error_msg)
                     raise RuntimeError(error_msg)
             
