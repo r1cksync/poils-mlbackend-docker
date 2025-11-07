@@ -61,15 +61,8 @@ async def extract_text_from_upload(
         
         start_time = time.time()
         
-        # Handle PDF
-        if image.content_type == "application/pdf":
-            images = image_processor.pdf_to_images(contents)
-            if not images:
-                raise HTTPException(status_code=400, detail="Failed to extract images from PDF")
-            pil_image = images[0]  # Process first page
-        else:
-            # Convert to PIL Image
-            pil_image = image_processor.bytes_to_image(contents)
+        # Convert to PIL Image
+        pil_image = image_processor.bytes_to_image(contents)
         
         # Get image info before processing
         original_info = image_processor.get_image_info(pil_image)

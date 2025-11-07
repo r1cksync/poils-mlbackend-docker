@@ -1,10 +1,10 @@
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+import httpx
 from PIL import Image
-import torch
+import io
 import logging
 import time
-from typing import Dict, Optional
-import asyncio
+from typing import Dict
+import base64
 
 from app.core.config import settings
 
@@ -13,49 +13,35 @@ logger = logging.getLogger(__name__)
 
 class ModelService:
     """
-    Service for managing the Microsoft TrOCR model.
-    Handles model loading, inference, and resource management.
+    Service for Hindi OCR using Hugging Face Inference API.
+    No local model loading required - uses cloud API instead.
     """
     
     def __init__(self):
-        self.model_name = settings.MODEL_NAME
-        self.processor: Optional[TrOCRProcessor] = None
-        self.model: Optional[VisionEncoderDecoderModel] = None
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.is_loaded = False
+        self.api_url = settings.HUGGINGFACE_API_URL
+        self.api_key = settings.HUGGINGFACE_API_KEY
+        self.model_name = settings.HUGGINGFACE_MODEL
+        self.is_loaded = True  # Always "loaded" since we use API
+        
+        self.headers = {}
+        if self.api_key:
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
     
     async def load_model(self):
-        """Load the TrOCR model and processor"""
-        try:
-            logger.info(f"Loading model: {self.model_name}")
-            logger.info(f"Using device: {self.device}")
-            
-            # Load processor (tokenizer + feature extractor)
-            self.processor = TrOCRProcessor.from_pretrained(
-                self.model_name,
-                cache_dir=settings.MODEL_CACHE_DIR
-            )
-            
-            # Load model
-            self.model = VisionEncoderDecoderModel.from_pretrained(
-                self.model_name,
-                cache_dir=settings.MODEL_CACHE_DIR
-            )
-            
-            # Move model to device
-            self.model.to(self.device)
-            self.model.eval()  # Set to evaluation mode
-            
-            self.is_loaded = True
-            logger.info(f"✅ Model loaded successfully on {self.device}")
-            
-            # Log model info
-            total_params = sum(p.numel() for p in self.model.parameters())
-            logger.info(f"Model parameters: {total_params:,}")
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to load model: {str(e)}")
-            raise RuntimeError(f"Model loading failed: {str(e)}")
+        """
+        No model loading needed - using Hugging Face Inference API.
+        This method exists for compatibility with the original interface.
+        """
+        logger.info(f"✅ Using Hugging Face Inference API")
+        logger.info(f"Model: {self.model_name}")
+        logger.info(f"API: {self.api_url}")
+        
+        if not self.api_key:
+            logger.warning("⚠️ No HUGGINGFACE_API_KEY provided - using free tier (rate limited)")
+        else:
+            logger.info("✅ API key configured")
+        
+        self.is_loaded = True
     
     async def extract_text(
         self, 
@@ -63,72 +49,83 @@ class ModelService:
         max_length: int = 512
     ) -> Dict:
         """
-        Extract Hindi text from image using TrOCR model.
+        Extract Hindi text from image using Hugging Face Inference API.
         
         Args:
             image: PIL Image to process
-            max_length: Maximum length of generated text
+            max_length: Not used with API, kept for compatibility
             
         Returns:
-            Dictionary with extracted text, confidence, and metadata
+            Dictionary with extracted text and metadata
         """
         if not self.is_loaded:
-            raise RuntimeError("Model not loaded. Call load_model() first.")
+            raise RuntimeError("Service not initialized. Call load_model() first.")
         
         try:
             start_time = time.time()
             
-            # Preprocess image
-            pixel_values = self.processor(
-                images=image, 
-                return_tensors="pt"
-            ).pixel_values
+            # Convert PIL Image to bytes
+            buffer = io.BytesIO()
+            image.save(buffer, format='PNG')
+            image_bytes = buffer.getvalue()
             
-            # Move to device
-            pixel_values = pixel_values.to(self.device)
+            logger.info(f"Sending request to Hugging Face API ({len(image_bytes)} bytes)")
             
-            # Generate text with no_grad for inference
-            with torch.no_grad():
-                generated_ids = self.model.generate(
-                    pixel_values,
-                    max_length=max_length,
-                    num_beams=4,  # Beam search for better results
-                    early_stopping=True
+            # Call Hugging Face Inference API
+            async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
+                response = await client.post(
+                    self.api_url,
+                    headers=self.headers,
+                    data=image_bytes
                 )
             
-            # Decode generated text
-            extracted_text = self.processor.batch_decode(
-                generated_ids, 
-                skip_special_tokens=True
-            )[0]
+            # Handle response
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Extract text from response
+                # API returns: {"generated_text": "extracted text"}
+                extracted_text = ""
+                if isinstance(result, list) and len(result) > 0:
+                    extracted_text = result[0].get("generated_text", "")
+                elif isinstance(result, dict):
+                    extracted_text = result.get("generated_text", "")
+                
+                processing_time = time.time() - start_time
+                
+                logger.info(f"✅ Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
+                
+                return {
+                    "text": extracted_text.strip(),
+                    "confidence": 0.85,  # API doesn't provide confidence
+                    "processing_time": round(processing_time, 2),
+                    "device": "cloud-api",
+                    "model": self.model_name
+                }
             
-            processing_time = time.time() - start_time
+            elif response.status_code == 503:
+                # Model is loading
+                logger.warning("Model is loading on Hugging Face, please retry in a moment")
+                return {
+                    "text": "",
+                    "confidence": 0.0,
+                    "processing_time": time.time() - start_time,
+                    "device": "cloud-api",
+                    "model": self.model_name,
+                    "error": "Model is loading, please retry in 20-30 seconds"
+                }
             
-            logger.info(f"Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
+            else:
+                error_msg = f"API request failed: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
             
-            return {
-                "text": extracted_text.strip(),
-                "confidence": self._calculate_confidence(generated_ids),
-                "processing_time": round(processing_time, 2),
-                "device": self.device,
-                "model": self.model_name
-            }
-            
+        except httpx.TimeoutException:
+            logger.error("Request timeout - API took too long to respond")
+            raise RuntimeError("Request timeout - please try again")
         except Exception as e:
             logger.error(f"Text extraction failed: {str(e)}")
             raise RuntimeError(f"OCR processing failed: {str(e)}")
-    
-    def _calculate_confidence(self, generated_ids: torch.Tensor) -> float:
-        """
-        Calculate confidence score based on model output.
-        This is a simplified confidence calculation.
-        """
-        try:
-            # For now, return a placeholder confidence
-            # In production, you'd calculate this from model logits
-            return 0.85
-        except:
-            return 0.0
     
     async def batch_extract(
         self, 
@@ -140,7 +137,7 @@ class ModelService:
         
         Args:
             images: List of PIL Images
-            max_length: Maximum length of generated text
+            max_length: Not used with API
             
         Returns:
             List of extraction results
@@ -164,28 +161,17 @@ class ModelService:
         return results
     
     def cleanup(self):
-        """Clean up model resources"""
-        try:
-            if self.model:
-                del self.model
-            if self.processor:
-                del self.processor
-            
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            
-            self.is_loaded = False
-            logger.info("Model resources cleaned up")
-            
-        except Exception as e:
-            logger.error(f"Cleanup failed: {str(e)}")
+        """Clean up resources (nothing to clean for API service)"""
+        logger.info("API service cleanup - no resources to free")
+        self.is_loaded = False
     
     def get_model_info(self) -> Dict:
-        """Get information about the loaded model"""
+        """Get information about the API service"""
         return {
             "model_name": self.model_name,
             "is_loaded": self.is_loaded,
-            "device": self.device,
-            "cuda_available": torch.cuda.is_available(),
-            "torch_version": torch.__version__
+            "service_type": "huggingface-inference-api",
+            "api_url": self.api_url,
+            "has_api_key": bool(self.api_key),
+            "rate_limit": "Free tier (no key)" if not self.api_key else "Authenticated"
         }

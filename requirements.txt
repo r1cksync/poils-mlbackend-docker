@@ -3,21 +3,13 @@ fastapi>=0.104.1
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
-# Machine Learning & OCR
-torch>=2.1.0
-torchvision>=0.16.0
-transformers>=4.35.0
+# Image processing (lightweight)
 Pillow>=10.1.0
-opencv-python-headless>=4.8.1.78
-
-# Image processing
-numpy>=1.26.0
-pdf2image>=1.16.3
 
 # HTTP and utilities
 requests>=2.31.0
-aiofiles>=23.2.1
 aiohttp>=3.9.0
+httpx>=0.25.0
 python-dotenv>=1.0.0
 
 # Monitoring and logging

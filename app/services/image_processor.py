@@ -3,15 +3,12 @@ import io
 import base64
 import logging
 from typing import Tuple, Optional
-import cv2
-import numpy as np
-from pdf2image import convert_from_bytes
 
 logger = logging.getLogger(__name__)
 
 
 class ImageProcessor:
-    """Image preprocessing and utilities for OCR"""
+    """Lightweight image preprocessing and utilities for OCR"""
     
     def __init__(self, max_dimension: int = 2048):
         self.max_dimension = max_dimension
@@ -49,17 +46,6 @@ class ImageProcessor:
             logger.error(f"Failed to convert base64 to image: {str(e)}")
             raise ValueError("Invalid base64 image data")
     
-    @staticmethod
-    def pdf_to_images(pdf_bytes: bytes) -> list[Image.Image]:
-        """Convert PDF to list of PIL Images"""
-        try:
-            images = convert_from_bytes(pdf_bytes)
-            logger.info(f"Converted PDF to {len(images)} images")
-            return images
-        except Exception as e:
-            logger.error(f"Failed to convert PDF: {str(e)}")
-            raise ValueError("Invalid PDF file")
-    
     def resize_image(self, image: Image.Image) -> Image.Image:
         """Resize image if it exceeds max dimensions"""
         width, height = image.size
@@ -78,42 +64,10 @@ class ImageProcessor:
         logger.info(f"Resizing image from {width}x{height} to {new_width}x{new_height}")
         return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
     
-    @staticmethod
-    def preprocess_for_ocr(image: Image.Image) -> Image.Image:
-        """
-        Preprocess image to improve OCR accuracy.
-        Applies grayscale conversion, contrast enhancement, and noise reduction.
-        """
-        try:
-            # Convert PIL to OpenCV
-            img_array = np.array(image)
-            
-            # Convert to grayscale if colored
-            if len(img_array.shape) == 3:
-                gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-            else:
-                gray = img_array
-            
-            # Apply adaptive thresholding for better text contrast
-            processed = cv2.adaptiveThreshold(
-                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                cv2.THRESH_BINARY, 11, 2
-            )
-            
-            # Denoise
-            processed = cv2.fastNlMeansDenoising(processed, None, 10, 7, 21)
-            
-            # Convert back to PIL
-            return Image.fromarray(processed)
-            
-        except Exception as e:
-            logger.warning(f"Preprocessing failed, using original image: {str(e)}")
-            return image
-    
     def prepare_image(self, image: Image.Image, preprocess: bool = True) -> Image.Image:
         """
         Complete image preparation pipeline.
-        Converts to RGB, resizes, and optionally preprocesses.
+        Converts to RGB and resizes if needed.
         """
         try:
             # Convert to RGB if necessary
@@ -122,10 +76,6 @@ class ImageProcessor:
             
             # Resize if too large
             image = self.resize_image(image)
-            
-            # Apply OCR preprocessing
-            if preprocess:
-                image = self.preprocess_for_ocr(image)
             
             return image
             

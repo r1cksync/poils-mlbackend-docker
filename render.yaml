@@ -18,16 +18,10 @@ services:
         value: 8000
       - key: DEBUG
         value: false
-      - key: MODEL_NAME
+      - key: HUGGINGFACE_MODEL
         value: microsoft/trocr-base-printed
-      - key: MODEL_CACHE_DIR
-        value: /app/model_cache
+      - key: HUGGINGFACE_API_KEY
+        sync: false  # Add your HF API key in Render dashboard
     
     # Health check
     healthCheckPath: /health
-    
-    # Disk storage for model cache
-    disk:
-      name: model-cache
-      mountPath: /app/model_cache
-      sizeGB: 5
