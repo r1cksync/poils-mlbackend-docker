@@ -28,7 +28,7 @@ async def get_model_service(request: Request) -> ModelService:
         # Fallback for serverless environments where lifespan may not run
         logger.info("Using lazy-loaded model service for serverless environment")
         service = ModelService()
-        await service.load_model()
+        # No need to call load_model() - Google Cloud Vision initializes in __init__
         return service
 
 
@@ -40,7 +40,7 @@ async def get_model_service(request: Request) -> ModelService:
         500: {"model": ErrorResponse}
     },
     summary="Extract text from uploaded image",
-    description="Upload an image file (JPEG, PNG, PDF) and extract Hindi text using Microsoft TrOCR"
+    description="Upload an image file (JPEG, PNG, PDF) and extract Hindi text using Google Cloud Vision API"
 )
 async def extract_text_from_upload(
     request: Request,
@@ -118,7 +118,7 @@ async def extract_text_from_upload(
         500: {"model": ErrorResponse}
     },
     summary="Extract text from image URL",
-    description="Provide an image URL and extract Hindi text using Microsoft TrOCR"
+    description="Provide an image URL and extract Hindi text using Google Cloud Vision API"
 )
 async def extract_text_from_url(
     request: Request,
@@ -205,7 +205,7 @@ async def extract_text_from_url(
         500: {"model": ErrorResponse}
     },
     summary="Extract text from base64 image",
-    description="Provide a base64 encoded image and extract Hindi text using Microsoft TrOCR"
+    description="Provide a base64 encoded image and extract Hindi text using Google Cloud Vision API"
 )
 async def extract_text_from_base64(
     request: Request,
@@ -266,10 +266,10 @@ async def extract_text_from_base64(
 @router.get(
     "/model-info",
     summary="Get model information",
-    description="Get information about the loaded OCR model"
+    description="Get information about the Google Cloud Vision OCR service"
 )
 async def get_model_info_endpoint(request: Request):
-    """Get information about the Hugging Face OCR service"""
+    """Get information about the Google Cloud Vision OCR service"""
     try:
         model_service = await get_model_service(request)
         return model_service.get_model_info()

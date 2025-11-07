@@ -39,11 +39,11 @@ async def lifespan(app: FastAPI):
     """
     try:
         logger.info("🚀 Starting Hindi OCR API Server...")
-        logger.info(f"Using Hugging Face Inference API: {settings.HUGGINGFACE_MODEL}")
+        logger.info(f"Using Google Cloud Vision API for Hindi OCR")
         
-        # Pre-initialize model service
+        # Pre-initialize model service (Google Cloud Vision initializes in __init__)
         service = get_model_service()
-        await service.load_model()
+        # No need to call load_model() - Google Cloud Vision initializes automatically
         
         # Store in app state
         app.state.model_service = service
