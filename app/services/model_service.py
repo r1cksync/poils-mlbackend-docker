@@ -1,5 +1,4 @@
 import httpx
-from huggingface_hub import InferenceClient
 from PIL import Image
 import io
 import logging
@@ -14,29 +13,30 @@ logger = logging.getLogger(__name__)
 
 class ModelService:
     """
-    Service for Hindi OCR using Hugging Face InferenceClient.
-    Uses the new huggingface_hub library instead of deprecated API.
+    Service for OCR using Hugging Face Inference API (direct HTTP).
+    More reliable than InferenceClient for serverless environments.
     """
     
     def __init__(self):
-        # Use HF InferenceClient with the new API
+        # Use direct HTTP API instead of InferenceClient (more reliable)
+        self.api_url = f"https://api-inference.huggingface.co/models/{settings.HUGGINGFACE_MODEL}"
         self.api_key = settings.HUGGINGFACE_API_KEY
         self.model_name = settings.HUGGINGFACE_MODEL
         self.is_loaded = True
         
-        # Initialize InferenceClient
-        self.client = InferenceClient(
-            model=self.model_name,
-            token=self.api_key if self.api_key and len(self.api_key) > 10 else None
-        )
+        # Build headers
+        self.headers = {}
+        if self.api_key and len(self.api_key) > 10:
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
     
     async def load_model(self):
         """
-        No model loading needed - using Hugging Face InferenceClient.
+        No model loading needed - using Hugging Face Inference API directly.
         This method exists for compatibility with the original interface.
         """
-        logger.info(f"✅ Using Hugging Face InferenceClient")
+        logger.info(f"✅ Using Hugging Face Inference API (direct HTTP)")
         logger.info(f"Model: {self.model_name}")
+        logger.info(f"API URL: {self.api_url}")
         
         if not self.api_key or len(self.api_key) < 10:
             logger.warning("⚠️ No HUGGINGFACE_API_KEY provided - using free tier (rate limited)")
@@ -51,7 +51,7 @@ class ModelService:
         max_length: int = 512
     ) -> Dict:
         """
-        Extract text from image using Hugging Face InferenceClient.
+        Extract text from image using Hugging Face Inference API (direct HTTP).
         
         Args:
             image: PIL Image to process
@@ -68,75 +68,83 @@ class ModelService:
             
             # Convert PIL Image to bytes
             buffer = io.BytesIO()
-            image.save(buffer, format='PNG')
+            image.save(buffer, format='JPEG', quality=95)
             image_bytes = buffer.getvalue()
             
-            logger.info(f"Sending request to Hugging Face InferenceClient")
+            logger.info(f"Sending request to HF Inference API ({len(image_bytes)} bytes)")
             
-            # Use InferenceClient for image-to-text
-            # Try with PIL Image object first (preferred method)
-            try:
-                logger.info("Trying with PIL Image object...")
-                result = self.client.image_to_text(image)
-                logger.info(f"Success! Raw result from InferenceClient: {result}")
-            except Exception as client_error:
-                logger.error(f"InferenceClient error with PIL Image: {str(client_error)}")
-                logger.error(f"Error type: {type(client_error).__name__}")
-                try:
-                    # Fallback: try with raw bytes
-                    logger.info("Trying with raw bytes...")
-                    result = self.client.image_to_text(image_bytes)
-                    logger.info(f"Success with bytes! Raw result: {result}")
-                except Exception as bytes_error:
-                    logger.error(f"InferenceClient error with bytes: {str(bytes_error)}")
-                    logger.error(f"Bytes error type: {type(bytes_error).__name__}")
-                    
-                    # Check if model is available
-                    logger.warning(f"Model {self.model_name} may not support Inference API")
-                    logger.info("This could be because:")
-                    logger.info("1. Model doesn't support serverless inference")
-                    logger.info("2. Model requires specific authentication")
-                    logger.info("3. Model is not available via Inference API")
-                    
-                    # Return a helpful error instead of crashing
-                    return {
-                        "text": "",
-                        "confidence": 0.0,
-                        "processing_time": time.time() - start_time,
-                        "device": "cloud-api",
-                        "model": self.model_name,
-                        "error": f"Model '{self.model_name}' not available via Inference API. PIL error: {str(client_error)}, Bytes error: {str(bytes_error)}"
-                    }
+            # Call Hugging Face Inference API directly
+            async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
+                response = await client.post(
+                    self.api_url,
+                    headers=self.headers,
+                    content=image_bytes
+                )
             
-            # Extract text from response
-            extracted_text = ""
-            if isinstance(result, str):
-                extracted_text = result
-            elif isinstance(result, list) and len(result) > 0:
-                # Result might be a list of dictionaries
-                if isinstance(result[0], dict) and "generated_text" in result[0]:
-                    extracted_text = result[0]["generated_text"]
-                elif isinstance(result[0], str):
-                    extracted_text = result[0]
-            elif isinstance(result, dict) and "generated_text" in result:
-                extracted_text = result["generated_text"]
+            # Handle response
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"API Response: {result}")
+                
+                # Extract text from response
+                extracted_text = ""
+                if isinstance(result, list) and len(result) > 0:
+                    if isinstance(result[0], dict) and "generated_text" in result[0]:
+                        extracted_text = result[0]["generated_text"]
+                    elif isinstance(result[0], str):
+                        extracted_text = result[0]
+                elif isinstance(result, dict) and "generated_text" in result:
+                    extracted_text = result["generated_text"]
+                elif isinstance(result, str):
+                    extracted_text = result
+                
+                processing_time = time.time() - start_time
+                logger.info(f"✅ Text extracted in {processing_time:.2f}s: '{extracted_text}'")
+                
+                return {
+                    "text": extracted_text.strip(),
+                    "confidence": 0.85,  # API doesn't provide confidence
+                    "processing_time": round(processing_time, 2),
+                    "device": "cloud-api",
+                    "model": self.model_name
+                }
             
-            logger.info(f"Extracted text: '{extracted_text}'")
+            elif response.status_code == 503:
+                # Model is loading
+                logger.warning("Model is loading on Hugging Face, please retry in a moment")
+                return {
+                    "text": "",
+                    "confidence": 0.0,
+                    "processing_time": time.time() - start_time,
+                    "device": "cloud-api",
+                    "model": self.model_name,
+                    "error": "Model is loading, please retry in 20-30 seconds"
+                }
             
-            processing_time = time.time() - start_time
-            logger.info(f"✅ Text extracted in {processing_time:.2f}s: {extracted_text[:50]}...")
+            else:
+                error_msg = f"API request failed: {response.status_code} - {response.text[:200]}"
+                logger.error(error_msg)
+                return {
+                    "text": "",
+                    "confidence": 0.0,
+                    "processing_time": time.time() - start_time,
+                    "device": "cloud-api",
+                    "model": self.model_name,
+                    "error": f"API error: {response.status_code}"
+                }
             
+        except httpx.TimeoutException:
+            logger.error("Request timeout - API took too long to respond")
             return {
-                "text": extracted_text.strip(),
-                "confidence": 0.85,  # API doesn't provide confidence
-                "processing_time": round(processing_time, 2),
+                "text": "",
+                "confidence": 0.0,
+                "processing_time": time.time() - start_time,
                 "device": "cloud-api",
-                "model": self.model_name
+                "model": self.model_name,
+                "error": "Request timeout"
             }
-            
         except Exception as e:
             logger.error(f"Text extraction failed: {str(e)}")
-            # Return informative error
             return {
                 "text": "",
                 "confidence": 0.0,
@@ -185,12 +193,12 @@ class ModelService:
         self.is_loaded = False
     
     def get_model_info(self) -> Dict:
-        """Get information about the InferenceClient service"""
+        """Get information about the Inference API service"""
         return {
             "model_name": self.model_name,
             "is_loaded": self.is_loaded,
-            "service_type": "huggingface-inference-client",
-            "client_type": "InferenceClient",
+            "service_type": "huggingface-inference-api",
+            "api_url": self.api_url,
             "has_api_key": bool(self.api_key and len(self.api_key) > 10),
             "rate_limit": "Free tier (rate limited)" if not (self.api_key and len(self.api_key) > 10) else "Authenticated (higher limits)"
         }
