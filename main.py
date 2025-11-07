@@ -91,7 +91,7 @@ async def root():
     """Root endpoint - API information"""
     return {
         "service": "Hindi OCR API (Google Cloud Vision)",
-        "version": "4.0.0",
+        "version": "4.0.1",
         "status": "running",
         "model": "Google Cloud Vision API",
         "endpoints": {
