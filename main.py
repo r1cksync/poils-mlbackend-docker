@@ -68,8 +68,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="Hindi OCR API",
-    description="FastAPI service for Hindi text extraction using Microsoft TrOCR model",
-    version="1.0.0",
+    description="FastAPI service for Hindi text extraction using Vision Encoder-Decoder (ViT + Hindi RoBERTa)",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
