@@ -111,7 +111,7 @@ class ModelService:
                 # API key has insufficient permissions or endpoint deprecated with auth, try without auth
                 logger.warning(f"Auth error ({response.status_code}), retrying without authentication (free tier)")
                 
-                async with httpx.AsyncClient(timeout=settings.API_timeout) as client:
+                async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
                     retry_response = await client.post(
                         self.api_url,
                         headers={"Content-Type": "image/png"},
