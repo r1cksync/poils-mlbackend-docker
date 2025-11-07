@@ -104,6 +104,39 @@ class ModelService:
                     "model": self.model_name
                 }
             
+            elif response.status_code == 403:
+                # API key has insufficient permissions, try without auth
+                logger.warning("API key has insufficient permissions, retrying without authentication (free tier)")
+                
+                async with httpx.AsyncClient(timeout=settings.API_TIMEOUT) as client:
+                    retry_response = await client.post(
+                        self.api_url,
+                        data=image_bytes
+                    )
+                
+                if retry_response.status_code == 200:
+                    result = retry_response.json()
+                    extracted_text = ""
+                    if isinstance(result, list) and len(result) > 0:
+                        extracted_text = result[0].get("generated_text", "")
+                    elif isinstance(result, dict):
+                        extracted_text = result.get("generated_text", "")
+                    
+                    processing_time = time.time() - start_time
+                    logger.info(f"✅ Text extracted (free tier) in {processing_time:.2f}s: {extracted_text[:50]}...")
+                    
+                    return {
+                        "text": extracted_text.strip(),
+                        "confidence": 0.85,
+                        "processing_time": round(processing_time, 2),
+                        "device": "cloud-api-free",
+                        "model": self.model_name
+                    }
+                else:
+                    error_msg = f"API request failed even without auth: {retry_response.status_code} - {retry_response.text}"
+                    logger.error(error_msg)
+                    raise RuntimeError(error_msg)
+            
             elif response.status_code == 503:
                 # Model is loading
                 logger.warning("Model is loading on Hugging Face, please retry in a moment")
