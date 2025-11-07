@@ -71,17 +71,24 @@ class ModelService:
             image.save(buffer, format='PNG')
             image_bytes = buffer.getvalue()
             
-            logger.info(f"Sending request to Hugging Face InferenceClient ({len(image_bytes)} bytes)")
+            logger.info(f"Sending request to Hugging Face InferenceClient")
             
             # Use InferenceClient for image-to-text
-            # Pass the raw bytes directly to the client
+            # Try with PIL Image object first (preferred method)
             try:
-                result = self.client.image_to_text(image_bytes)
-                logger.info(f"Raw result from InferenceClient: {result}")
-            except Exception as client_error:
-                logger.error(f"InferenceClient error: {str(client_error)}")
-                # Fallback: try with PIL Image object
+                logger.info("Trying with PIL Image object...")
                 result = self.client.image_to_text(image)
+                logger.info(f"Success! Raw result from InferenceClient: {result}")
+            except Exception as client_error:
+                logger.error(f"InferenceClient error with PIL Image: {str(client_error)}")
+                try:
+                    # Fallback: try with raw bytes
+                    logger.info("Trying with raw bytes...")
+                    result = self.client.image_to_text(image_bytes)
+                    logger.info(f"Success with bytes! Raw result: {result}")
+                except Exception as bytes_error:
+                    logger.error(f"InferenceClient error with bytes: {str(bytes_error)}")
+                    raise RuntimeError(f"Both PIL Image and bytes failed: {str(client_error)}, {str(bytes_error)}")
             
             # Extract text from response
             extracted_text = ""

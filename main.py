@@ -91,9 +91,9 @@ async def root():
     """Root endpoint - API information"""
     return {
         "service": "Hindi OCR API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "running",
-        "model": settings.MODEL_NAME,
+        "model": settings.HUGGINGFACE_MODEL,
         "endpoints": {
             "health": "/health",
             "docs": "/docs",
